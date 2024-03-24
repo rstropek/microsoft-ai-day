@@ -1,0 +1,19 @@
+{
+    "recommendations": [
+        "ms-azuretools.vscode-docker",
+        "ms-vscode-remote.vscode-remote-extensionpack",
+        "ms-dotnettools.csharp",
+        "usernamehw.errorlens",
+        "mikestead.dotenv",
+        "wayou.vscode-todo-highlight",
+        "ms-vscode-remote.remote-wsl",
+        "EditorConfig.EditorConfig",
+        "GitHub.copilot",
+        "GitHub.copilot-chat",
+        "codezombiech.gitignore",
+        "yzhang.markdown-all-in-one",
+        "aliasadidev.nugetpackagemanagergui",
+        "esbenp.prettier-vscode",
+        "humao.rest-client"
+    ]
+}
