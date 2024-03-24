@@ -25,5 +25,9 @@ RUN mkdir -p -m 755 /etc/apt/keyrings && wget -qO- https://cli.github.com/packag
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
+# Clone sample code
+WORKDIR /root
+RUN git clone https://github.com/rstropek/microsoft-ai-day.git
+
 # To use GitHub CLI, run `gh auth login`.
 # Recommendation: After login, enable GitHub Copilot in the CLI using `gh extension install github/gh-copilot`.
