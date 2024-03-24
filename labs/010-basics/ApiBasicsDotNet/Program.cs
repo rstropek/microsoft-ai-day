@@ -37,7 +37,7 @@ var chatCompletionOptions = new ChatCompletionsOptions(
 
       Only answer questions related to bike type selection. If the user asks
       questions not related to this topic, tell her or him that you cannot
-      answer such questions-
+      answer such questions.
       """),
     // Initial assistant message to get the conversation started
     new ChatRequestAssistantMessage("""
