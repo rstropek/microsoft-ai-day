@@ -1,0 +1,31 @@
+{
+	"name": "Microsoft AI Day",
+	"image": "rstropek/microsoft-ai-day",
+	"customizations": {
+		"vscode": {
+			"settings": {},
+			"extensions": [
+				"ms-azuretools.vscode-docker",
+                "ms-vscode-remote.vscode-remote-extensionpack",
+                "ms-dotnettools.csharp",
+                "usernamehw.errorlens",
+                "mikestead.dotenv",
+                "wayou.vscode-todo-highlight",
+                "ms-vscode-remote.remote-wsl",
+                "EditorConfig.EditorConfig",
+                "GitHub.copilot",
+                "GitHub.copilot-chat",
+                "codezombiech.gitignore",
+                "yzhang.markdown-all-in-one",
+                "aliasadidev.nugetpackagemanagergui",
+                "esbenp.prettier-vscode",
+                "humao.rest-client",
+                "github.vscode-github-actions"
+			]
+		}
+	},
+
+	"forwardPorts": [8080, 8081, 3000, 3001],
+
+	"remoteUser": "root"
+}
