@@ -42,7 +42,7 @@ class ApplicationDataContext(DbContextOptions options) : DbContext(options)
             throw new InvalidOperationException("At least one filter must be provided.");
         }
 
-        var query = Customers.AsNoTracking().AsQueryable();
+        var query = Customers.AsNoTracking().Where(c => c.CustomerID >= 29485).AsQueryable();
         if (filter.CustomerID is not null)
         {
             query = query.Where(c => c.CustomerID == filter.CustomerID);
@@ -132,32 +132,80 @@ class ApplicationDataContext(DbContextOptions options) : DbContext(options)
     }
 
     /// <summary>
-    /// Get revenue statistics for a customer.
+    /// Get top customers by revenue.
     /// </summary>
-    /// <param name="filter">Filter for retrieving revenue statistics</param>
-    /// <returns>
-    /// Array of revenue statistics for the customer.
-    /// </returns>
-    public async Task<CustomerRevenueStats[]> GetCustomerRevenueStats(CustomerRevenueFilter filter)
+    public async Task<TopCustomerResult[]> GetTopCustomers(TopCustomerFilter filter)
     {
-        var query = SalesOrderDetails.AsNoTracking().AsQueryable();
-
-        if (filter.CustomerID is not null)
+        var query = SalesOrderHeaders.AsNoTracking().Where(c => c.CustomerID >= 29485).AsQueryable();
+        if (filter.Year is not null)
         {
-            query = query.Where(sod => sod.SalesOrder!.CustomerID == filter.CustomerID);
+            query = query.Where(soh => soh.OrderDate.Year == filter.Year);
+        }
+        if (filter.Month is not null)
+        {
+            query = query.Where(soh => soh.OrderDate.Month == filter.Month);
         }
 
-        var result = query
-            .GroupBy(sod => new { sod.SalesOrder!.CustomerID, sod.ProductID, sod.SalesOrder!.OrderDate.Year, sod.SalesOrder!.OrderDate.Month })
-            .Select(g => new CustomerRevenueStats(
-                g.Key.CustomerID,
+        var result = await query
+            .SelectMany(soh => soh.SalesOrderDetails)
+            .GroupBy(sod => sod.Product!.ProductCategory!.ProductCategoryID)
+            .Select(g => new {
+                g.First().SalesOrder!.CustomerID,
+                TotalRevenue = g.Sum(sod => sod.LineTotal)
+            })
+            .OrderByDescending(r => r.TotalRevenue)
+            .ToArrayAsync();
+        return result.Select(r => new TopCustomerResult(r.CustomerID, r.TotalRevenue)).ToArray();
+    }
+
+    /// <summary>
+    /// Get revenue trend for a customer.
+    /// </summary>
+    public async Task<CustomerRevenueTrendResult[]> GetCustomerRevenueTrend(CustomerDetailStatsFilter filter)
+    {
+        if (!await Customers.AsNoTracking().AnyAsync(c => c.CustomerID == filter.CustomerID))
+        {
+            throw new InvalidOperationException("There is no customer with the specified ID.");
+        }
+
+        var result = await SalesOrderDetails.AsNoTracking()
+            .Where(c => c.SalesOrder!.CustomerID >= 29485)
+            .Where(sod => sod.SalesOrder!.CustomerID == filter.CustomerID)
+            .GroupBy(sod => new { sod.SalesOrder!.OrderDate.Year, sod.SalesOrder!.OrderDate.Month })
+            .Select(g => new {
+                filter.CustomerID,
                 g.Key.Year,
                 g.Key.Month,
-                g.Sum(sod => sod.LineTotal)
-            ));
+                TotalRevenue = g.Sum(sod => sod.LineTotal)
+            })
+            .OrderBy(r => r.Year)
+            .ThenBy(r => r.Month)
+            .ToArrayAsync();
+        return result.Select(r => new CustomerRevenueTrendResult(r.CustomerID, r.Year, r.Month, r.TotalRevenue)).ToArray();
+    }
 
-        return await result.ToArrayAsync();
+    /// <summary>
+    /// Get product breakdown for a customer.
+    /// </summary>
+    public async Task<CustomerProductBreakdownResult[]> GetCustomerProductBreakdown(CustomerDetailStatsFilter filter)
+    {
+        if (!await Customers.AsNoTracking().AnyAsync(c => c.CustomerID == filter.CustomerID))
+        {
+            throw new InvalidOperationException("There is no customer with the specified ID.");
+        }
 
+        var result = await SalesOrderDetails.AsNoTracking()
+            .Where(c => c.SalesOrder!.CustomerID >= 29485)
+            .Where(sod => sod.SalesOrder!.CustomerID == filter.CustomerID)
+            .GroupBy(sod => sod.ProductID)
+            .Select(g => new {
+                filter.CustomerID,
+                g.Key,
+                TotalRevenue = g.Sum(sod => sod.LineTotal)
+            })
+            .OrderByDescending(r => r.TotalRevenue)
+            .ToArrayAsync();
+        return result.Select(r => new CustomerProductBreakdownResult(r.CustomerID, r.Key, r.TotalRevenue)).ToArray();
     }
 }
 
@@ -176,13 +224,30 @@ record ProductFilter(
     int? ProductCategoryID
 );
 
-record CustomerRevenueFilter(
-    int? CustomerID
+record TopCustomerFilter(
+    int? Year,
+    int? Month
 );
 
-record CustomerRevenueStats(
+record TopCustomerResult(
+    int CustomerID,
+    decimal TotalRevenue
+);
+
+record CustomerDetailStatsFilter(
+    int CustomerID
+);
+
+record CustomerRevenueTrendResult(
     int CustomerID,
     int Year,
     int Month,
     decimal TotalRevenue
 );
+
+record CustomerProductBreakdownResult(
+    int CustomerID,
+    int ProductID,
+    decimal TotalRevenue
+);
+

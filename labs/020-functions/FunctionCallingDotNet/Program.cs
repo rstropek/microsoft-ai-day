@@ -1,4 +1,5 @@
 ﻿using System.Text.Json;
+using System.Text.Json.Serialization.Metadata;
 using Azure;
 using Azure.AI.OpenAI;
 using dotenv.net;
@@ -33,6 +34,10 @@ var chatCompletionOptions = new ChatCompletionsOptions(
       Only answer questions related to customer and product revenue. If the user asks
       questions not related to this topic, tell her or him that you cannot
       answer such questions.
+
+      If the user asks a question that cannot be answered with the provided function tools,
+      tell her or him that you cannot answer the question because of a lack of access
+      to the required data.
       """),
     // Initial assistant message to get the conversation started
     new ChatRequestAssistantMessage("""
@@ -49,18 +54,9 @@ var chatCompletionOptions = new ChatCompletionsOptions(
             {
                 Name = "getCustomers",
                 Description = """
-                Gets a filtered list of customers. The result contains the following colums:
-                * CustomerID
-                * FirstName
-                * MiddleName
-                * LastName
-                * CompanyName
-                At least one filter MUST be provided in the parameters.
-                Note that our customer database is a little messie. Some customers are
-                multiple times in the database with different IDs. If you find customer
-                entries with identical names, you can assume that they are the same customer
-                and add their revenues.
-                """,
+                    Gets a filtered list of customers. At least one filter MUST be provided in
+                    the parameters. The result list is limited to 25 customer.
+                    """,
                 Parameters = BinaryData.FromObjectAsJson(
                 new
                 {
@@ -101,15 +97,9 @@ var chatCompletionOptions = new ChatCompletionsOptions(
             {
                 Name = "getProducts",
                 Description = """
-                Gets a filtered list of products. The result contains the following colums:
-                * ProductID
-                * Name
-                * ProductNumber
-                * Color
-                * ListPrice
-                * ProductCategoryID
-                At least one filter MUST be provided in the parameters.
-                """,
+                    Gets a filtered list of products. At least one filter MUST be
+                    provided in the parameters. The result list is limited to 25 customer.
+                    """,
                 Parameters = BinaryData.FromObjectAsJson(
                 new
                 {
@@ -143,37 +133,16 @@ var chatCompletionOptions = new ChatCompletionsOptions(
         new ChatCompletionsFunctionToolDefinition(
             new FunctionDefinition()
             {
-                Name = "getCustomerRevenueStatistics",
+                Name = "getTopCustomers",
                 Description = """
-                Get revenue statistics for a customer. The result contains the following colums:
-                * CustomerID
-                * ProductID
-                * Year
-                * Month
-                * TotalRevenue
-                """,
+                    Gets the customers with their revenue sorted by revenue in descending order.
+                    """,
                 Parameters = BinaryData.FromObjectAsJson(
                 new
                 {
                     Type = "object",
                     Properties = new
                     {
-                        CustomerID = new
-                        {
-                            Type = "integer",
-                            Description = """
-                                Optional customer filter for which the revenue should be queried.
-                                If not provided, the revenue for all customers is queried.
-                                """
-                        },
-                        ProductID = new
-                        {
-                            Type = "integer",
-                            Description = """
-                                Optional product for which the revenue should be queried.
-                                If not provided, the revenue for all products is queried.
-                                """
-                        },
                         Year = new
                         {
                             Type = "integer",
@@ -186,6 +155,52 @@ var chatCompletionOptions = new ChatCompletionsOptions(
                         }
                     },
                     Required = Array.Empty<string>()
+                }, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase })
+            }),
+        new ChatCompletionsFunctionToolDefinition(
+            new FunctionDefinition()
+            {
+                Name = "getCustomerRevenueTrend",
+                Description = """
+                    Gets the total revenue for a given customer per year, and month.
+                    Use this function to analyze the revenue trend of a specific customer.
+                    """,
+                Parameters = BinaryData.FromObjectAsJson(
+                new
+                {
+                    Type = "object",
+                    Properties = new
+                    {
+                        CustomerID = new
+                        {
+                            Type = "integer",
+                            Description = "ID of the customer to get the revenue trend for."
+                        }
+                    },
+                    Required = new[] { "customerID" }
+                }, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase })
+            }),
+        new ChatCompletionsFunctionToolDefinition(
+            new FunctionDefinition()
+            {
+                Name = "getCustomerProductBreakdown",
+                Description = """
+                    Gets the total revenue for a given customer per product. Use this function
+                    to analyze the revenue breakdown of a specific customer.
+                    """,
+                Parameters = BinaryData.FromObjectAsJson(
+                new
+                {
+                    Type = "object",
+                    Properties = new
+                    {
+                        CustomerID = new
+                        {
+                            Type = "integer",
+                            Description = "ID of the customer to get the revenue trend for."
+                        }
+                    },
+                    Required = new[] { "customerID" }
                 }, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase })
             })
     },
@@ -257,8 +272,16 @@ while (true)
                         result = await ExecuteQuery<ProductFilter, Product>(context, toolCall, context.GetProducts);
                         break;
 
-                    case "getCustomerRevenueStatistics":
-                        result = await ExecuteQuery<CustomerRevenueFilter, CustomerRevenueStats>(context, toolCall, context.GetCustomerRevenueStats);
+                    case "getTopCustomers":
+                        result = await ExecuteQuery<TopCustomerFilter, TopCustomerResult>(context, toolCall, context.GetTopCustomers);
+                        break;
+
+                    case "getCustomerRevenueTrend":
+                        result = await ExecuteQuery<CustomerDetailStatsFilter, CustomerRevenueTrendResult>(context, toolCall, context.GetCustomerRevenueTrend);
+                        break;
+
+                    case "getCustomerProductBreakdown":
+                        result = await ExecuteQuery<CustomerDetailStatsFilter, CustomerProductBreakdownResult>(context, toolCall, context.GetCustomerProductBreakdown);
                         break;
 
                     default:
@@ -281,19 +304,19 @@ while (true)
 static async Task<ChatRequestToolMessage> ExecuteQuery<TFilter, TResult>(ApplicationDataContext context, ChatCompletionsFunctionToolCall toolCall, Func<TFilter, Task<TResult[]>> body)
 {
     ChatRequestToolMessage result;
+    var jsonOptions = new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
     try
     {
         // Deserialize arguments
-        var filter = JsonSerializer.Deserialize<TFilter>(toolCall.Arguments,
-            new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase })!;
+        var filter = JsonSerializer.Deserialize<TFilter>(toolCall.Arguments, jsonOptions)!;
 
         // Get result from the database
         var customers = await body(filter);
-        result = new ChatRequestToolMessage(JsonSerializer.Serialize(customers), toolCall.Id);
+        result = new ChatRequestToolMessage(JsonSerializer.Serialize(customers, jsonOptions), toolCall.Id);
     }
     catch (Exception ex)
     {
-        result = new ChatRequestToolMessage(JsonSerializer.Serialize(new { Error = ex.Message }), toolCall.Id);
+        result = new ChatRequestToolMessage(JsonSerializer.Serialize(new { Error = ex.Message }, jsonOptions), toolCall.Id);
     }
 
     return result;

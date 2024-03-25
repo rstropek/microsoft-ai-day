@@ -19,3 +19,4 @@ This example introduces you to the fundamentals of using the Azure OpenAI API. W
 
 * Setup an ChatGPT 3.5 model and compare the results with the GPT-4 model.
 * Convert the console application to an ASP.NET Core web application.
+* Use streaming to receive messages from the OpenAI API step by step.
