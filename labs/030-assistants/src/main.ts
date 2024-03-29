@@ -6,6 +6,7 @@ import { TextContentBlock } from 'openai/resources/beta/threads/index.mjs';
 import { FunctionToolCall } from 'openai/resources/beta/threads/runs/steps.mjs';
 import { createConnectionPool } from './sql.js';
 import { getCustomers, getCustomersFunctionDefinition } from './functions.js';
+import { readLine } from './input.js';
 
 dotenv.config({ path: '../../.env' });
 
@@ -49,30 +50,29 @@ tell her or him that you cannot answer the question because of a lack of access
 to the required data.`
 }, logger);
 
-let run = await openai.beta.threads.createAndRunToCompletion({
-    assistant_id: assistant.id,
-    thread: {
-        messages: [{ role: 'user', content: 'I want to analyze the revenue of customer Orlando Gee. First, find his customer id.' }]
+const thread = await openai.beta.threads.create();
+while (true) {
+    const userMessage = await readLine('\nYou (just press enter to exit the conversation): ');
+    if (!userMessage) { break; }
+
+    const run = await openai.beta.threads.addMessageAndRunToCompletion(assistant.id, thread.id, userMessage, logger, async (functionCall: FunctionToolCall.Function) => {
+        if (functionCall.name === 'getCustomers') {
+            return await getCustomers(pool, JSON.parse(functionCall.arguments));
+        }
+
+        return [];
+    });
+
+    if (run.status === 'completed') {
+        const messages = await openai.beta.threads.messages.list(
+            run.thread_id,
+            { order: 'desc' }
+        );
+        const tcb = messages.data[0].content[0] as TextContentBlock;
+
+        console.log(`\n🤖: ${tcb.text.value}`);
     }
-}, logger, async (functionCall: FunctionToolCall.Function) => {
-    await new Promise(resolve => setTimeout(resolve, 250)); // Wait for 1 second
-    if (functionCall.name === 'getCustomers') {
-        return await getCustomers(pool, JSON.parse(functionCall.arguments));
-    }
 
-    return [];
-});
-if (run.status === 'completed') {
-    // Note that you could get details about the steps performed by
-    // the assistent by accessing `openai.beta.threads.runs.steps.list(...)`
-
-    const messages = await openai.beta.threads.messages.list(
-        run.thread_id,
-        { order: 'desc' }
-    );
-    const tcb = messages.data[0].content[0] as TextContentBlock;
-
-    console.log(tcb.text.value);
 }
 
 pool.close();

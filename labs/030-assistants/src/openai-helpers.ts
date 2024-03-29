@@ -11,7 +11,7 @@ declare module "openai" {
             }
 
             export interface Threads {
-                createAndRunToCompletion(params: ThreadCreateAndRunParamsNonStreaming, logger: winston.Logger | undefined,
+                addMessageAndRunToCompletion(assistantId: string, threadId: string, message: string, logger: winston.Logger | undefined,
                     functionCallback: (f: FunctionToolCall.Function) => Promise<any>): Promise<OpenAI.Beta.Threads.Run>;
             }
         }
@@ -53,9 +53,10 @@ OpenAI.Beta.Assistants.prototype.createOrUpdate = async function (assistant: Ope
     return result;
 }
 
-OpenAI.Beta.Threads.prototype.createAndRunToCompletion = async function (params: OpenAI.Beta.ThreadCreateAndRunParamsNonStreaming, 
+OpenAI.Beta.Threads.prototype.addMessageAndRunToCompletion = async function (assistantId: string, threadId: string, message: string, 
     logger: winston.Logger | undefined, functionCallback: (f: FunctionToolCall.Function) => Promise<any>): Promise<OpenAI.Beta.Threads.Run> {
-    let run = await this.createAndRun(params);
+    await this.messages.create(threadId, { role: 'user', content: message });
+    let run = await this.runs.create(threadId, { assistant_id: assistantId });
     logger?.info('Run created', { id: run.id });
 
     while (['queued', 'in_progress', 'cancelling', 'requires_action'].includes(run.status)) {
