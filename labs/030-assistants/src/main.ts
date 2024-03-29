@@ -2,10 +2,9 @@ import OpenAI from 'openai';
 import dotenv from 'dotenv';
 import './openai-helpers.js';
 import winston from 'winston';
-import { TextContentBlock } from 'openai/resources/beta/threads/index.mjs';
 import { FunctionToolCall } from 'openai/resources/beta/threads/runs/steps.mjs';
 import { createConnectionPool } from './sql.js';
-import { getCustomers, getCustomersFunctionDefinition } from './functions.js';
+import { getCustomers, getCustomersFunctionDefinition, getProducts, getProductsFunctionDefinition } from './functions.js';
 import { readLine } from './input.js';
 
 dotenv.config({ path: '../../.env' });
@@ -35,7 +34,8 @@ let assistant = await openai.beta.assistants.createOrUpdate({
     description: 'Retrieves customer and product revenue and analyzes it using code interpreter',
     tools: [
         { type: 'code_interpreter' },
-        { type: 'function', function: getCustomersFunctionDefinition }
+        { type: 'function', function: getCustomersFunctionDefinition },
+        { type: 'function', function: getProductsFunctionDefinition },
     ],
     instructions: `You are an assistant supporting business users who need to analyze the revene of
 customers and products. Use the provided function tools to access the order database
@@ -56,21 +56,19 @@ while (true) {
     if (!userMessage) { break; }
 
     const run = await openai.beta.threads.addMessageAndRunToCompletion(assistant.id, thread.id, userMessage, logger, async (functionCall: FunctionToolCall.Function) => {
-        if (functionCall.name === 'getCustomers') {
-            return await getCustomers(pool, JSON.parse(functionCall.arguments));
+        switch (functionCall.name) {
+            case 'getCustomers':
+                return await getCustomers(pool, JSON.parse(functionCall.arguments));
+            case 'getProducts':
+                return await getProducts(pool, JSON.parse(functionCall.arguments));
+            default:
+                throw new Error(`Function ${functionCall.name} is not supported`);
         }
-
-        return [];
     });
 
     if (run.status === 'completed') {
-        const messages = await openai.beta.threads.messages.list(
-            run.thread_id,
-            { order: 'desc' }
-        );
-        const tcb = messages.data[0].content[0] as TextContentBlock;
-
-        console.log(`\n🤖: ${tcb.text.value}`);
+        const lastMessage = await openai.beta.threads.getLatestMessage(thread.id);
+        console.log(`\n🤖: ${lastMessage}`);
     }
 
 }

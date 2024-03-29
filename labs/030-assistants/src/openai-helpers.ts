@@ -1,4 +1,5 @@
 import OpenAI from 'openai';
+import { TextContentBlock } from 'openai/resources/beta/threads/index.mjs';
 import { FunctionToolCall, ToolCallsStepDetails } from 'openai/resources/beta/threads/runs/steps.mjs';
 import winston from 'winston';
 
@@ -13,6 +14,7 @@ declare module "openai" {
             export interface Threads {
                 addMessageAndRunToCompletion(assistantId: string, threadId: string, message: string, logger: winston.Logger | undefined,
                     functionCallback: (f: FunctionToolCall.Function) => Promise<any>): Promise<OpenAI.Beta.Threads.Run>;
+                getLatestMessage(threadId: string): Promise<string>;
             }
         }
     }
@@ -66,8 +68,16 @@ OpenAI.Beta.Threads.prototype.addMessageAndRunToCompletion = async function (ass
             const toolCall = (steps.data[0].step_details as ToolCallsStepDetails).tool_calls[0] as FunctionToolCall;
             const functionCall = (toolCall).function
             logger?.info('Calling function', { name: functionCall.name, arguments: functionCall.arguments });
-            const result = await functionCallback(functionCall);
-            run = await this.runs.submitToolOutputs(run.thread_id, run.id, { tool_outputs: [{ tool_call_id: toolCall.id, output: JSON.stringify(result) }] });
+            let functionResponse: string;
+            try {
+                const result = await functionCallback(functionCall);
+                functionResponse = JSON.stringify(result);
+            } catch (error: any) {
+                logger?.warn('Function call failed, returning error message to ChatGPT', { name: functionCall.name, error: error.message });
+                functionResponse = error.message;
+            }
+
+            run = await this.runs.submitToolOutputs(run.thread_id, run.id, { tool_outputs: [{ tool_call_id: toolCall.id, output: functionResponse }] });
         }
 
         await new Promise(resolve => setTimeout(resolve, 1000)); // Wait for 1 second
@@ -79,4 +89,14 @@ OpenAI.Beta.Threads.prototype.addMessageAndRunToCompletion = async function (ass
 
     logger?.info('Final run status', { id: run.status });
     return run;
+}
+
+OpenAI.Beta.Threads.prototype.getLatestMessage = async function (threadId: string): Promise<string> {
+    const messages = await this.messages.list(
+        threadId,
+        { order: 'desc' }
+    );
+    const tcb = messages.data[0].content[0] as TextContentBlock;
+
+    return tcb.text.value;
 }

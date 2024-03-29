@@ -64,3 +64,55 @@ export async function getCustomers(pool: sql.ConnectionPool, filter: GetCustomer
 
     return result.recordset as Customer[];
 }
+
+export const getProductsFunctionDefinition = {
+    name: 'getProducts',
+    description: 'Gets a filtered list of products. At least one filter MUST be provided in the parameters. The result list is limited to 25 products.',
+    parameters: {
+        type: 'object',
+        properties: {
+            productID: { type: 'integer', description: 'Optional filter for the product ID.' },
+            name: { type: 'string', description: 'Optional filter for the product name.' },
+            productNumber: { type: 'string', description: 'Optional filter for the product number.' },
+            productCategoryID: { type: 'integer', description: 'Optional filter for the product category ID.' }
+        },
+        required: []
+    }
+};
+
+export type GetProductsParameters = {
+    productID?: number;
+    name?: string;
+    productNumber?: string;
+};
+
+export type Product = {
+    productID: number;
+    name: string;
+    productNumber: string;
+};
+
+export async function getProducts(pool: sql.ConnectionPool, filter: GetProductsParameters): Promise<Product[]> {
+    if (!filter.productID && !filter.name && !filter.productNumber) {
+        throw new Error('At least one filter must be provided.');
+    }
+
+    const request = pool.request();
+    let query = `SELECT TOP 25 ProductID, Name, ProductNumber, ProductCategoryID FROM SalesLT.Product WHERE 1 = 1`;
+    if (filter.productID) {
+        query += ' AND ProductID = @productID';
+        request.input('productID', sql.Int, filter.productID);
+    }
+    if (filter.name) {
+        query += ' AND Name LIKE \'%\' + @name + \'%\'';
+        request.input('name', sql.NVarChar, filter.name);
+    }
+    if (filter.productNumber) {
+        query += ' AND ProductNumber LIKE \'%\' + @productNumber + \'%\'';
+        request.input('productNumber', sql.NVarChar, filter.productNumber);
+    }
+
+    const result = await request.query(query);
+
+    return result.recordset as Product[];
+}
