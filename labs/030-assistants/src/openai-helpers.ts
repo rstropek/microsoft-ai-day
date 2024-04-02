@@ -1,6 +1,6 @@
 import OpenAI from 'openai';
-import { TextContentBlock } from 'openai/resources/beta/threads/index.mjs';
-import { FunctionToolCall, ToolCallsStepDetails } from 'openai/resources/beta/threads/runs/steps.mjs';
+import { RunSubmitToolOutputsParams, TextContentBlock } from 'openai/resources/beta/threads/index.mjs';
+import { CodeInterpreterToolCall, FunctionToolCall, ToolCallsStepDetails } from 'openai/resources/beta/threads/runs/steps.mjs';
 import winston from 'winston';
 
 declare module "openai" {
@@ -63,21 +63,40 @@ OpenAI.Beta.Threads.prototype.addMessageAndRunToCompletion = async function (ass
 
     while (['queued', 'in_progress', 'cancelling', 'requires_action'].includes(run.status)) {
         logger?.info('Run status', { status: run.status })
+        const steps = await this.runs.steps.list(run.thread_id, run.id, { order: 'desc', limit: 1 });
+        for (const step of steps.data) {
+            if (step.step_details.type === 'tool_calls') {
+                const toolCall = step.step_details as ToolCallsStepDetails;
+                for (const call of toolCall.tool_calls) {
+                    if (call.type === 'code_interpreter') {
+                        const interpreterCall = call as CodeInterpreterToolCall;
+                        if (interpreterCall.code_interpreter.input) {
+                            logger?.info('Code interpreter call', { code: interpreterCall.code_interpreter.input });
+                        }
+                    }
+                }
+            }
+        }
+        
         if (run.status === 'requires_action') {
-            const steps = await this.runs.steps.list(run.thread_id, run.id, { order: 'desc', limit: 1 });
-            const toolCall = (steps.data[0].step_details as ToolCallsStepDetails).tool_calls[0] as FunctionToolCall;
-            const functionCall = (toolCall).function
-            logger?.info('Calling function', { name: functionCall.name, arguments: functionCall.arguments });
-            let functionResponse: string;
-            try {
-                const result = await functionCallback(functionCall);
-                functionResponse = JSON.stringify(result);
-            } catch (error: any) {
-                logger?.warn('Function call failed, returning error message to ChatGPT', { name: functionCall.name, error: error.message });
-                functionResponse = error.message;
+            const toolOutput: RunSubmitToolOutputsParams.ToolOutput[] = [];
+            for (const call of (steps.data[0].step_details as ToolCallsStepDetails).tool_calls) {
+                const toolCall = call as FunctionToolCall;
+                const functionCall = toolCall.function;
+                logger?.info('Calling function', { callID: toolCall.id, name: functionCall.name, arguments: functionCall.arguments });
+                let functionResponse: string;
+                try {
+                    const result = await functionCallback(functionCall);
+                    functionResponse = JSON.stringify(result);
+                } catch (error: any) {
+                    logger?.warn('Function call failed, returning error message to ChatGPT', { name: functionCall.name, error: error.message });
+                    functionResponse = error.message;
+                }
+    
+                toolOutput.push({ tool_call_id: toolCall.id, output: functionResponse });
             }
 
-            run = await this.runs.submitToolOutputs(run.thread_id, run.id, { tool_outputs: [{ tool_call_id: toolCall.id, output: functionResponse }] });
+            run = await this.runs.submitToolOutputs(run.thread_id, run.id, { tool_outputs: toolOutput });
         }
 
         await new Promise(resolve => setTimeout(resolve, 1000)); // Wait for 1 second

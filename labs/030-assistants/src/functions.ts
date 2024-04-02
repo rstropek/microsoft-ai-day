@@ -1,4 +1,5 @@
 import sql from 'mssql';
+import winston from 'winston';
 
 export const getCustomersFunctionDefinition = {
     name: 'getCustomers',
@@ -32,7 +33,7 @@ export type Customer = {
     companyName?: string;
 };
 
-export async function getCustomers(pool: sql.ConnectionPool, filter: GetCustomersParameters): Promise<Customer[]> {
+export async function getCustomers(pool: sql.ConnectionPool, filter: GetCustomersParameters, logger: winston.Logger | undefined): Promise<Customer[]> {
     if (!filter.customerID && !filter.firstName && !filter.middleName && !filter.lastName && !filter.companyName) {
         throw new Error('At least one filter must be provided.');
     }
@@ -60,6 +61,7 @@ export async function getCustomers(pool: sql.ConnectionPool, filter: GetCustomer
         request.input('companyName', sql.NVarChar, filter.companyName);
     }
 
+    logger?.info('Executing query', { query });
     const result = await request.query(query);
 
     return result.recordset as Customer[];
@@ -92,7 +94,7 @@ export type Product = {
     productNumber: string;
 };
 
-export async function getProducts(pool: sql.ConnectionPool, filter: GetProductsParameters): Promise<Product[]> {
+export async function getProducts(pool: sql.ConnectionPool, filter: GetProductsParameters, logger: winston.Logger | undefined): Promise<Product[]> {
     if (!filter.productID && !filter.name && !filter.productNumber) {
         throw new Error('At least one filter must be provided.');
     }
@@ -112,7 +114,94 @@ export async function getProducts(pool: sql.ConnectionPool, filter: GetProductsP
         request.input('productNumber', sql.NVarChar, filter.productNumber);
     }
 
+    logger?.info('Executing query', { query });
     const result = await request.query(query);
 
     return result.recordset as Product[];
+}
+
+
+export const getCustomerProductsRevenueFunctionDefinition = {
+    name: 'getCustomerProductsRevenue',
+    description: 'Gets the revenue of the customer and products. The result is ordered by the revenue in descending order. The result list is limited to 25 records.',
+    parameters: {
+        type: 'object',
+        properties: {
+            customerID: { type: 'integer', description: 'Optional filter for the customer ID.' },
+            productID: { type: 'integer', description: 'Optional filter for the product ID.' },
+            year: { type: 'integer', description: 'Optional filter for the year.' },
+            month: { type: 'integer', description: 'Optional filter for the month.' },
+            groupByCustomer: { type: 'boolean', description: 'If true, revenue is grouped by customer ID.' },
+            groupByProduct: { type: 'boolean', description: 'If true, revenue is grouped by product ID.' },
+            groupByYear: { type: 'boolean', description: 'If true, revenue is grouped by year.' },
+            groupByMonth: { type: 'boolean', description: 'If true, revenue is grouped by month.' }
+        },
+        required: []
+    }
+
+};
+
+export type GetCustomerProductsRevenueParameters = {
+    customerID?: number;
+    productID?: number;
+    year?: number;
+    month?: number;
+    groupByCustomer?: number;
+    groupByProduct?: number;
+    groupByYear?: number;
+    groupByMonth?: number;
+}
+
+export type CustomerProductsRevenue = {
+    revenue: number;
+    customerID?: number;
+    productID?: number;
+    year?: number;
+    month?: number;
+}
+
+export async function getCustomerProductsRevenue(pool: sql.ConnectionPool, filter: GetCustomerProductsRevenueParameters, logger: winston.Logger | undefined)
+    : Promise<CustomerProductsRevenue[]> {
+    const request = pool.request();
+
+    let query = `SELECT TOP 25 SUM(LineTotal) AS Revenue`;
+    if (filter.groupByCustomer) { query += ', CustomerID'; }
+    if (filter.groupByProduct) { query += ', ProductID'; }
+    if (filter.groupByYear) { query += ', YEAR(OrderDate) AS Year'; }
+    if (filter.groupByMonth) { query += ', MONTH(OrderDate) AS Month'; }
+
+    query += ' FROM SalesLT.SalesOrderDetail d INNER JOIN SalesLT.SalesOrderHeader h ON d.SalesOrderID = h.SalesOrderID WHERE 1 = 1';
+
+    if (filter.customerID) {
+        query += ' AND CustomerID = @customerID';
+        request.input('customerID', sql.Int, filter.customerID);
+    }
+    if (filter.productID) {
+        query += ' AND ProductID = @productID';
+        request.input('productID', sql.Int, filter.productID);
+    }
+    if (filter.year) {
+        query += ' AND YEAR(OrderDate) = @year';
+        request.input('year', sql.Int, filter.year);
+    }
+    if (filter.month) {
+        query += ' AND MONTH(OrderDate) = @month';
+        request.input('month', sql.Int, filter.month);
+    }
+
+    if (filter.groupByCustomer || filter.groupByProduct || filter.groupByYear || filter.groupByMonth) {
+        const groupColumns = [];
+        if (filter.groupByCustomer) { groupColumns.push('CustomerID'); }
+        if (filter.groupByProduct) { groupColumns.push('ProductID'); }
+        if (filter.groupByYear) { groupColumns.push('YEAR(OrderDate)'); }
+        if (filter.groupByMonth) { groupColumns.push('MONTH(OrderDate)'); }
+        query += ` GROUP BY ${groupColumns.join(', ')}`;
+    }
+
+    query += ' ORDER BY SUM(LineTotal) DESC';
+
+    logger?.info('Executing query', { query });
+    const result = await request.query(query);
+
+    return result.recordset as CustomerProductsRevenue[];
 }
