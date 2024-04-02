@@ -20,7 +20,10 @@
                 "aliasadidev.nugetpackagemanagergui",
                 "esbenp.prettier-vscode",
                 "humao.rest-client",
-                "github.vscode-github-actions"
+                "github.vscode-github-actions",
+                "ms-python.python",
+                "ms-python.debugpy",
+                "KevinRose.vsc-python-indent"
 			]
 		}
 	},
