@@ -21,8 +21,13 @@ RUN mkdir -p -m 755 /etc/apt/keyrings && wget -qO- https://cli.github.com/packag
     && chmod go+r /etc/apt/keyrings/githubcli-archive-keyring.gpg \
     && echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | tee /etc/apt/sources.list.d/github-cli.list > /dev/null \
     && apt update \
-    && apt install gh -y \
-    && apt-get clean \
+    && apt install gh -y
+
+# Install Python
+RUN apt install -y python3 python3-pip python-is-python3
+
+# Clean apt cache
+RUN apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
 # Clone sample code
