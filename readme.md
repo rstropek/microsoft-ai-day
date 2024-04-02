@@ -1,5 +1,20 @@
 # Microsoft AI Day
 
+## Introduction
+
+This repository contains demos and samples for the [_Microsoft Build: AI Day (Austria)_](https://msevents.microsoft.com/event?id=3431470856). It contains the following labs:
+
+* [OpenAI Chat Completions Basics](./labs/010-basics/) (C# and .NET)
+* [Function Calling with Chat Completions](./labs/020-functions/) (C# and .NET)
+* [Using Tools with the new _Assistant_ API](./labs/030-assistants/) (TypeScript and Node.js)
+* [Embeddings and the RAG model](./labs/040-embeddings-rag/) (TypeScript and Node.js)
+
+Attendees can decide the complexity level on their own:
+
+* L200: People who are less familiar with coding can take the existing code, try to run it (description will be provided), play with prompts, and think about possible use cases in their professional or personal life.
+* L300: People who are a bit familiar with coding can extend the existing code by copying and modify parts of the samples (ideas will be provided).
+* L400: People who are very familiar with coding can take the samples as a starting point or inspiration and implement their own use case.
+
 ## Getting Started
 
 We recommend that you use [_Development Containers_](https://containers.dev/) to work with this repository. Here is how you can get started:
