@@ -1,10 +1,14 @@
 import sql from 'mssql';
 
+/**
+ * Creates a connection pool to the Azure SQL Server database and connects to it
+ */
 export async function createConnectionPool(connectionString: string): Promise<sql.ConnectionPool> {
     if (!connectionString) {
         throw new Error('Connection string is required');
     }
 
+    // Parse the connection string as we need server, user, etc. separately
     const connectionStringParts = new Map<string, string>(
         connectionString.split(';').map(p => p.split('=') as [string, string])
     );

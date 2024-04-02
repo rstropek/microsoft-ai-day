@@ -1,13 +1,29 @@
 import OpenAI from 'openai';
 import { RunSubmitToolOutputsParams, TextContentBlock } from 'openai/resources/beta/threads/index.mjs';
-import { CodeInterpreterToolCall, FunctionToolCall, ToolCallsStepDetails } from 'openai/resources/beta/threads/runs/steps.mjs';
+import { CodeInterpreterToolCall, FunctionToolCall, MessageCreationStepDetails, ToolCallsStepDetails } from 'openai/resources/beta/threads/runs/steps.mjs';
 import winston from 'winston';
+
+// Helper methods for OpenAI API
+//
+// Note that the helper methods are added to the OpenAI namespace to make it easier to use them in the main code.
 
 declare module "openai" {
     export namespace OpenAI {
         export namespace Beta {
             export interface Assistants {
+                /**
+                 * Finds an assistant by name
+                 * 
+                 * OpenAI does not offer a way to find an assistant by name. This method
+                 * iterates over all assistants and returns the first one with the given name.
+                 */
                 findAssistantByName(name: string, logger: winston.Logger | undefined): Promise<OpenAI.Beta.Assistants.Assistant | undefined>;
+
+                /**
+                 * Creates an assistant if it does not exist, or updates it if it does
+                 * 
+                 * Note that the assistant is identified by its name.
+                 */
                 createOrUpdate(assistant: OpenAI.Beta.AssistantCreateParams, logger: winston.Logger | undefined): Promise<OpenAI.Beta.Assistant>;
             }
 
@@ -18,6 +34,14 @@ declare module "openai" {
             }
         }
     }
+}
+
+export function isToolCall(details: MessageCreationStepDetails | ToolCallsStepDetails): details is ToolCallsStepDetails {
+    return details.type === 'tool_calls';
+}
+
+export function isCodeInterpreterCall(call: any): call is CodeInterpreterToolCall {
+    return call.type === 'code_interpreter';
 }
 
 OpenAI.Beta.Assistants.prototype.findAssistantByName = async function (name: string, logger: winston.Logger | undefined): Promise<OpenAI.Beta.Assistants.Assistant | undefined> {
@@ -64,20 +88,23 @@ OpenAI.Beta.Threads.prototype.addMessageAndRunToCompletion = async function (ass
     while (['queued', 'in_progress', 'cancelling', 'requires_action'].includes(run.status)) {
         logger?.info('Run status', { status: run.status })
         const steps = await this.runs.steps.list(run.thread_id, run.id, { order: 'desc', limit: 1 });
-        for (const step of steps.data) {
-            if (step.step_details.type === 'tool_calls') {
-                const toolCall = step.step_details as ToolCallsStepDetails;
-                for (const call of toolCall.tool_calls) {
-                    if (call.type === 'code_interpreter') {
-                        const interpreterCall = call as CodeInterpreterToolCall;
-                        if (interpreterCall.code_interpreter.input) {
-                            logger?.info('Code interpreter call', { code: interpreterCall.code_interpreter.input });
+
+        // If last step is a code interpreter call, log it (including generated Python code)
+        for (const step of steps.data.filter(s => isToolCall(s.step_details))) {
+            if (isToolCall(step.step_details)) {
+                for (const call of step.step_details.tool_calls) {
+                    if (isCodeInterpreterCall(call)) {
+                        if (call.code_interpreter.input) {
+                            logger?.info('Code Interpreter call', { code: call.code_interpreter.input });
                         }
+                    } else {
+                        logger?.info('Working on Code Interpreter script');
                     }
                 }
             }
         }
         
+        // Check if the run requires us to execute a function
         if (run.status === 'requires_action') {
             const toolOutput: RunSubmitToolOutputsParams.ToolOutput[] = [];
             for (const call of (steps.data[0].step_details as ToolCallsStepDetails).tool_calls) {

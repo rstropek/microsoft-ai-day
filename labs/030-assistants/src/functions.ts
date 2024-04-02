@@ -8,10 +8,10 @@ export const getCustomersFunctionDefinition = {
         type: 'object',
         properties: {
             customerID: { type: 'integer', description: 'Optional filter for the customer ID.' },
-            firstName: { type: 'string', description: 'Optional filter for the first name.' },
-            middleName: { type: 'string', description: 'Optional filter for the middle name.' },
-            lastName: { type: 'string', description: 'Optional filter for the last name.' },
-            companyName: { type: 'string', description: 'Optional filter for the company name.' }
+            firstName: { type: 'string', description: 'Optional filter for the first name (true if first name contains filter value).' },
+            middleName: { type: 'string', description: 'Optional filter for the middle name (true if middle name contains filter value).' },
+            lastName: { type: 'string', description: 'Optional filter for the last name (true if last name contains filter value).' },
+            companyName: { type: 'string', description: 'Optional filter for the company name (true if company name contains filter value).' }
         },
         required: []
     }
@@ -74,9 +74,8 @@ export const getProductsFunctionDefinition = {
         type: 'object',
         properties: {
             productID: { type: 'integer', description: 'Optional filter for the product ID.' },
-            name: { type: 'string', description: 'Optional filter for the product name.' },
-            productNumber: { type: 'string', description: 'Optional filter for the product number.' },
-            productCategoryID: { type: 'integer', description: 'Optional filter for the product category ID.' }
+            name: { type: 'string', description: 'Optional filter for the product name (true if product name contains filter value).' },
+            productNumber: { type: 'string', description: 'Optional filter for the product number.' }
         },
         required: []
     }
@@ -110,7 +109,7 @@ export async function getProducts(pool: sql.ConnectionPool, filter: GetProductsP
         request.input('name', sql.NVarChar, filter.name);
     }
     if (filter.productNumber) {
-        query += ' AND ProductNumber LIKE \'%\' + @productNumber + \'%\'';
+        query += ' AND ProductNumber = @productNumber';
         request.input('productNumber', sql.NVarChar, filter.productNumber);
     }
 
