@@ -60,7 +60,7 @@ if (fs.existsSync('embeddings.json')) {
 
 while (true) {
     const options = [
-        'Do you have paddles for my road bike?',
+        'Do you have padles for my road bike?',
         'I am looking for padels that I can ride with my regular shoes.',
         'I got a voucher from your store and I want to buy new clothes for mountain biking. What can you recommend?',
         'I got a voucher from your store and I want to buy new clothes for mountain biking. What can you recommend?'
