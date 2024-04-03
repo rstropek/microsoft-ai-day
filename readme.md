@@ -4,7 +4,7 @@
 
 This repository contains demos and samples for the [_Microsoft Build: AI Day (Austria)_](https://msevents.microsoft.com/event?id=3431470856). It contains the following labs:
 
-* [OpenAI Chat Completions Basics](./labs/010-basics/) (C# and .NET)
+* [OpenAI Chat Completions Basics](./labs/010-basics/) (C# and .NET or Python)
 * [Function Calling with Chat Completions](./labs/020-functions/) (C# and .NET)
 * [Using Tools with the new _Assistant_ API](./labs/030-assistants/) (TypeScript and Node.js)
 * [Embeddings and the RAG model](./labs/040-embeddings-rag/) (TypeScript and Node.js)
