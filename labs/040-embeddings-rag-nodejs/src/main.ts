@@ -114,7 +114,7 @@ ${(
         model: process.env.OPENAI_AZURE_DEPLOYMENT ?? ''
     },
         {
-            path: `${process.env.OPENAI_AZURE_ENDPOINT}openai/deployments/${process.env.OPENAI_AZURE_DEPLOYMENT}/chat/completions`
+            path: `${process.env.OPENAI_AZURE_ENDPOINT}/openai/deployments/${process.env.OPENAI_AZURE_DEPLOYMENT}/chat/completions`
         });
 
     console.log();
