@@ -25,7 +25,7 @@ const products = await getProductModels(pool);
 logger.info('Product models complete', { count: products.length });
 
 const openai = new OpenAI({
-    baseURL: `${process.env.OPENAI_AZURE_ENDPOINT}openai/deployments/${process.env.OPENAI_AZURE_EMBEDDINGS}/`,
+    baseURL: `${process.env.OPENAI_AZURE_ENDPOINT}/openai/deployments/${process.env.OPENAI_AZURE_EMBEDDINGS}/`,
     apiKey: process.env.OPENAI_AZURE_KEY,
     defaultQuery: { 'api-version': '2024-03-01-preview' },
     defaultHeaders: { 'api-key': process.env.OPENAI_AZURE_KEY }
