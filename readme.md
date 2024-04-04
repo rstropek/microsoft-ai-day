@@ -4,7 +4,7 @@
 
 This repository contains demos and samples for the [_Microsoft Build: AI Day (Austria)_](https://msevents.microsoft.com/event?id=3431470856). It contains the following labs:
 
-* [OpenAI Chat Completions Basics](./labs/010-basics/) (C# and .NET)
+* [OpenAI Chat Completions Basics](./labs/010-basics/) (C# and .NET or Python)
 * [Function Calling with Chat Completions](./labs/020-functions/) (C# and .NET)
 * [Using Tools with the new _Assistant_ API](./labs/030-assistants/) (TypeScript and Node.js)
 * [Embeddings and the RAG model](./labs/040-embeddings-rag/) (TypeScript and Node.js)
@@ -36,6 +36,10 @@ If you do not want to use _Dev Containers_, install the following software on yo
 * If you want to work with TypeScript and Node.js:
     * Latest LTS version of [Node.js](https://nodejs.org)
     * Latest version of Visual Studio Code
+
+## Environment variables
+
+Within this workshop we are working with a shared Azure OpenAI tenant and specific deployments. As part of the workshop you will receive an `.env` file from your instructors, so you can access the shared Azure OpenAI tenant from your project folder. After adding the `.env` file to the root of this repository, or copying the `.env.template` file and rename it, you will be able to execute the various `labs` in this repostiory.
 
 ## Sample Data
 
