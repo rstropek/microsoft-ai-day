@@ -22,7 +22,7 @@ logger.info('Connection pool connected');
 const openai = new OpenAI({
     // Note that this base URL is different from the one that you would need for 
     // chat completions API. The base URL here is for the new Assistants API.
-    baseURL: `${process.env.OPENAI_AZURE_ENDPOINT}openai`,
+    baseURL: `${process.env.OPENAI_AZURE_ENDPOINT}/openai`,
     apiKey: process.env.OPENAI_AZURE_KEY,
     defaultQuery: { 'api-version': '2024-03-01-preview' },
     defaultHeaders: { 'api-key': process.env.OPENAI_AZURE_KEY }
