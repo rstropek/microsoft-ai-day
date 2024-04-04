@@ -24,7 +24,10 @@ RUN mkdir -p -m 755 /etc/apt/keyrings && wget -qO- https://cli.github.com/packag
     && apt install gh -y
 
 # Install Python
-RUN apt install -y python3-full python3-pip python-is-python3
+RUN apt install -y python3-full python3-pip python-is-python3 \
+    && pip install python-dotenv --break-system-packages \
+    && pip install openai --break-system-packages
+
     
 # Clean apt cache
 RUN apt-get clean \
