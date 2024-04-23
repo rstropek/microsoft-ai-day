@@ -6,7 +6,9 @@ This repository contains demos and samples for the [_Microsoft Build: AI Day (Au
 
 * OpenAI Chat Completions Basics ([C# and .NET](./labs/010-basics-dotnet/) or [Python](./labs/015-basics-python/))
 * [Function Calling with Chat Completions](./labs/020-functions-dotnet/) (C# and .NET)
-* [Using Tools with the new _Assistant_ API](./labs/030-assistants-nodejs/) (TypeScript and Node.js)
+* Using Tools with the new _Assistant_ API
+  * [TypeScript and Node.js](./labs/030-assistants-nodejs/)
+  * [C# and .NET](./labs/035-assistants-dotnet/)
 * [Embeddings and the RAG model](./labs/040-embeddings-rag-nodejs/) (TypeScript and Node.js)
 
 Attendees can decide the complexity level on their own:

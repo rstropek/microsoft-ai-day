@@ -11,6 +11,8 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "020-functions", "020-functi
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FunctionCallingDotNet", "020-functions-dotnet\FunctionCallingDotNet\FunctionCallingDotNet.csproj", "{A71026F5-ACF4-49FF-94C4-73006234E737}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "035-assistants-dotnet", "035-assistants-dotnet\035-assistants-dotnet.csproj", "{4410FBFF-81EE-44E5-82CC-82E619380D87}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -28,6 +30,10 @@ Global
 		{A71026F5-ACF4-49FF-94C4-73006234E737}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{A71026F5-ACF4-49FF-94C4-73006234E737}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{A71026F5-ACF4-49FF-94C4-73006234E737}.Release|Any CPU.Build.0 = Release|Any CPU
+		{4410FBFF-81EE-44E5-82CC-82E619380D87}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{4410FBFF-81EE-44E5-82CC-82E619380D87}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{4410FBFF-81EE-44E5-82CC-82E619380D87}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{4410FBFF-81EE-44E5-82CC-82E619380D87}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
 		{99F0BCCA-ED5E-4654-937F-C79E7E2130C4} = {663030A0-0A93-4565-BEE2-2F356E49FEFA}
