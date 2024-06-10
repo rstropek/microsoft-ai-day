@@ -1,126 +1,92 @@
-using Azure.AI.OpenAI.Assistants;
+using OpenAI;
+using OpenAI.Assistants;
+#pragma warning disable OPENAI001
 
 namespace AssistantsDotNet;
 
 static class OpenAIExtensions
 {
-    public static async Task<Assistant?> FindAssistantByName(this AssistantsClient client, string name)
+    public static async Task<Assistant?> FindAssistantByName(this AssistantClient client, string name)
     {
-        PageableList<Assistant> assistants;
-        string? after = null;
-        do
+        await foreach (var assistant in client.GetAssistantsAsync())
         {
-            assistants = await client.GetAssistantsAsync(after: after);
-            foreach (var assistant in assistants)
-            {
-                if (assistant.Name == name) { return assistant; }
-            }
-
-            after = assistants.LastId;
+            if (assistant.Name == name) { return assistant; }
         }
-        while (assistants.HasMore);
 
         return null;
     }
 
-    public static async Task<Assistant> CreateOrUpdate(this AssistantsClient client, AssistantCreationOptions assistant)
+    public static async Task<Assistant> CreateOrUpdate(this AssistantClient client, string model, AssistantCreationOptions assistant)
     {
         var existing = await client.FindAssistantByName(assistant.Name);
         if (existing != null)
         {
-            var updateOptions = new UpdateAssistantOptions()
+            var updateOptions = new AssistantModificationOptions
             {
-                Model = assistant.Model,
+                Model = model,
                 Name = assistant.Name,
                 Description = assistant.Description,
                 Instructions = assistant.Instructions,
-                Metadata = assistant.Metadata
+                DefaultTools = assistant.Tools,
             };
-            foreach (var tool in assistant.Tools) { updateOptions.Tools.Add(tool); }
-            foreach (var fileId in assistant.FileIds) { updateOptions.FileIds.Add(fileId); }
 
-            return await client.UpdateAssistantAsync(existing.Id, updateOptions);
+            return await client.ModifyAssistantAsync(existing.Id, updateOptions);
         }
 
-        return await client.CreateAssistantAsync(assistant);
+        return await client.CreateAssistantAsync(model, assistant);
     }
 
-    public static async Task<ThreadRun> AddMessageAndRunToCompletion(this AssistantsClient client, string threadId, string assistantId,
-        string message, Func<RunStepFunctionToolCall, Task<object>>? functionCallback = null)
+    public static async IAsyncEnumerable<string> AddMessageAndRunToCompletion(this AssistantClient client, string threadId, string assistantId,
+        string message, Func<RequiredActionUpdate, Task<object>>? functionCallback = null)
     {
-        await client.CreateMessageAsync(threadId, MessageRole.User, message);
-        var run = await client.CreateRunAsync(threadId, new CreateRunOptions(assistantId));
-        Console.WriteLine($"Run created { run.Value.Id }");
+        await client.CreateMessageAsync(threadId, [message]);
+        var asyncUpdate = client.CreateRunStreamingAsync(threadId, assistantId);
 
-        while (run.Value.Status == RunStatus.Queued || run.Value.Status == RunStatus.InProgress || run.Value.Status == RunStatus.Cancelling || run.Value.Status == RunStatus.RequiresAction)
+        ThreadRun? currentRun;
+        do
         {
-            Console.WriteLine($"Run status { run.Value.Status }");
-
-            var steps = await client.GetRunStepsAsync(run, 1, ListSortOrder.Descending);
-
-            // If last step is a code interpreter call, log it (including generated Python code)
-            if (steps.Value.Any() && steps.Value.First().StepDetails is RunStepToolCallDetails toolCallDetails)
+            currentRun = null;
+            List<ToolOutput> outputsToSumit = [];
+            await foreach (var update in asyncUpdate)
             {
-                foreach(var call in toolCallDetails.ToolCalls)
+                if (update is RunUpdate runUpdate) { currentRun = runUpdate; }
+                else if (update is RequiredActionUpdate requiredActionUpdate && functionCallback != null)
                 {
-                    if (call is RunStepCodeInterpreterToolCall codeInterpreterToolCall && !string.IsNullOrEmpty(codeInterpreterToolCall.Input))
+                    Console.WriteLine($"Calling function {requiredActionUpdate.ToolCallId} {requiredActionUpdate.FunctionName} {requiredActionUpdate.FunctionArguments}");
+
+                    string functionResponse;
+                    try
                     {
-                        Console.WriteLine($"Code Interpreter Tool Call: {codeInterpreterToolCall.Input}");
+                        var result = await functionCallback(requiredActionUpdate);
+                        functionResponse = JsonHelpers.Serialize(result);
                     }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"Function call failed, returning error message to ChatGPT {requiredActionUpdate.FunctionName} {ex.Message}");
+                        functionResponse = ex.Message;
+                    }
+
+                    outputsToSumit.Add(new ToolOutput(requiredActionUpdate.ToolCallId, functionResponse));
+                }
+                else if (update is MessageContentUpdate contentUpdate)
+                {
+                    yield return contentUpdate.Text;
                 }
             }
 
-            // Check if the run requires us to execute a function
-            if (run.Value.Status == RunStatus.RequiresAction && functionCallback != null)
+            if (outputsToSumit.Count != 0)
             {
-                var toolOutput = new List<ToolOutput>();
-                if (steps.Value.First().StepDetails is RunStepToolCallDetails stepDetails)
-                {
-                    foreach(var call in stepDetails.ToolCalls.OfType<RunStepFunctionToolCall>())
-                    {
-                        Console.WriteLine($"Calling function { call.Id } { call.Name } { call.Arguments }");
-
-                        string functionResponse;
-                        try
-                        {
-                            var result = await functionCallback(call);
-                            functionResponse = JsonHelpers.Serialize(result);
-                        }
-                        catch (Exception ex)
-                        {
-                            Console.WriteLine($"Function call failed, returning error message to ChatGPT { call.Name } { ex.Message }");
-                            functionResponse = ex.Message;
-                        }
-
-                        toolOutput.Add(new()
-                        {
-                            ToolCallId = call.Id,
-                            Output = functionResponse
-                        });
-                    }
-                }
-
-                if (toolOutput.Count != 0)
-                {
-                    run = await client.SubmitToolOutputsToRunAsync(threadId, run.Value.Id, toolOutput);
-                }
+                asyncUpdate = client.SubmitToolOutputsToRunStreamingAsync(currentRun, outputsToSumit);
             }
-
-
-            await Task.Delay(1000);
-            run = await client.GetRunAsync(threadId, run.Value.Id);
         }
-
-        Console.WriteLine($"Final run status { run.Value.Status }");
-        return run;
+        while (currentRun?.Status.IsTerminal is false);
     }
 
-    public static async Task<string?> GetLatestMessage(this AssistantsClient client, string threadId)
+    public static async Task<string?> GetLatestMessage(this AssistantClient client, string threadId)
     {
-        var messages = await client.GetMessagesAsync(threadId, 1, ListSortOrder.Descending);
-        if (messages.Value.FirstOrDefault()?.ContentItems[0] is MessageTextContent tc)
+        await foreach(var msg in client.GetMessagesAsync(threadId, ListOrder.NewestFirst))
         {
-            return tc.Text;
+            return msg.Content[0].Text;
         }
 
         return null;

@@ -1,7 +1,8 @@
 ﻿using AssistantsDotNet;
-using Azure.AI.OpenAI.Assistants;
 using dotenv.net;
 using Microsoft.Data.SqlClient;
+using OpenAI.Assistants;
+#pragma warning disable OPENAI001
 
 // Get environment variables from .env file. We have to go up 7 levels to get to the root of the
 // git repository (because of bin/Debug/net8.0 folder).
@@ -14,9 +15,9 @@ await sqlConnection.OpenAsync();
 // In this sample, we use key-based authentication. This is only done because this sample
 // will be done by a larger group in a hackathon event. In real world, AVOID key-based
 // authentication. ALWAYS prefer Microsoft Entra-based authentication (Managed Identity)!
-var client = new AssistantsClient(env["OPENAI_KEY"]);
+var client = new AssistantClient(env["OPENAI_KEY"]);
 
-var assistant = await client.CreateOrUpdate(new(env["OPENAI_MODEL"])
+var assistant = await client.CreateOrUpdate(env["OPENAI_MODEL"], new AssistantCreationOptions
 {
     Name = "Revenue Analyzer",
     Description = "Retrieves customer and product revenue and analyzes it using code interpreter",
@@ -64,24 +65,26 @@ while (true)
         userMessage = options[selection - 1];
     }
 
-    var run = await client.AddMessageAndRunToCompletion(thread.Value.Id, assistant.Id, userMessage, async functionCall =>
+    var first = true;
+    await foreach (var message in client.AddMessageAndRunToCompletion(thread.Value.Id, assistant.Id, userMessage, async functionCall =>
     {
-        switch (functionCall.Name)
+        switch (functionCall.FunctionName)
         {
             case "getCustomers":
-                return await Functions.GetCustomers(sqlConnection, JsonHelpers.Deserialize<Functions.GetCustomersParameters>(functionCall.Arguments)!);
+                return await Functions.GetCustomers(sqlConnection, JsonHelpers.Deserialize<Functions.GetCustomersParameters>(functionCall.FunctionArguments)!);
             case "getProducts":
-                return await Functions.GetProducts(sqlConnection, JsonHelpers.Deserialize<Functions.GetProductsParameters>(functionCall.Arguments)!);
+                return await Functions.GetProducts(sqlConnection, JsonHelpers.Deserialize<Functions.GetProductsParameters>(functionCall.FunctionArguments)!);
             case "getCustomerProductsRevenue":
-                return await Functions.GetCustomerProductsRevenue(sqlConnection, JsonHelpers.Deserialize<Functions.GetCustomerProductsRevenueParameters>(functionCall.Arguments)!);
+                return await Functions.GetCustomerProductsRevenue(sqlConnection, JsonHelpers.Deserialize<Functions.GetCustomerProductsRevenueParameters>(functionCall.FunctionArguments)!);
             default:
-                throw new Exception($"Function {functionCall.Name} is not supported");
+                throw new Exception($"Function {functionCall.FunctionName} is not supported");
         }
-    });
-
-    if (run.Status == "completed")
+    }))
     {
-        var lastMessage = await client.GetLatestMessage(thread.Value.Id);
-        Console.WriteLine($"\n🤖: {lastMessage}");
+        if (first) { Console.Write($"\n🤖: "); first = false; }
+        Console.Write(message);
     }
+
+    Console.WriteLine();
+    //var lastMessage = await client.GetLatestMessage(thread.Value.Id);
 }

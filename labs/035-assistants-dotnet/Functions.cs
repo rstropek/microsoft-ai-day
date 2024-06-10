@@ -1,17 +1,19 @@
 using System.Data;
 using System.Text;
-using Azure.AI.OpenAI.Assistants;
 using Dapper;
 using Microsoft.Data.SqlClient;
+using OpenAI.Assistants;
+using OpenAI.Chat;
 
 namespace AssistantsDotNet;
 
 public static class Functions
 {
-    public static readonly FunctionToolDefinition GetCustomersFunctionDefinition = new(
-        "getCustomers",
-        "Gets a filtered list of customers. At least one filter MUST be provided in the parameters. The result list is limited to 25 customers.",
-        JsonHelpers.FromObjectAsJson(
+    public static readonly FunctionToolDefinition GetCustomersFunctionDefinition = new()
+    {
+        FunctionName = "getCustomers",
+        Description = "Gets a filtered list of customers. At least one filter MUST be provided in the parameters. The result list is limited to 25 customers.",
+        Parameters = JsonHelpers.FromObjectAsJson(
             new
             {
                 Type = "object",
@@ -25,7 +27,7 @@ public static class Functions
                 },
                 Required = Array.Empty<string>()
             })
-    );
+    };
 
     public class GetCustomersParameters
     {
@@ -88,10 +90,11 @@ public static class Functions
         return result;
     }
 
-    public static readonly FunctionToolDefinition GetProductsFunctionDefinition = new(
-        "getProducts",
-        "Gets a filtered list of products. At least one filter MUST be provided in the parameters. The result list is limited to 25 products.",
-        JsonHelpers.FromObjectAsJson(
+    public static readonly FunctionToolDefinition GetProductsFunctionDefinition = new()
+    {
+        FunctionName = "getProducts",
+        Description = "Gets a filtered list of products. At least one filter MUST be provided in the parameters. The result list is limited to 25 products.",
+        Parameters = JsonHelpers.FromObjectAsJson(
             new
             {
                 Type = "object",
@@ -103,7 +106,7 @@ public static class Functions
                 },
                 Required = Array.Empty<string>()
             })
-    );
+    };
 
     public class GetProductsParameters
     {
@@ -153,10 +156,11 @@ public static class Functions
         return result;
     }
 
-    public static readonly FunctionToolDefinition GetCustomerProductsRevenueFunctionDefinition = new(
-        "getCustomerProductsRevenue",
-        "Gets the revenue of the customer and products. The result is ordered by the revenue in descending order. The result list is limited to 25 records.",
-        JsonHelpers.FromObjectAsJson(
+    public static readonly FunctionToolDefinition GetCustomerProductsRevenueFunctionDefinition = new()
+    {
+        FunctionName = "getCustomerProductsRevenue",
+        Description = "Gets the revenue of the customer and products. The result is ordered by the revenue in descending order. The result list is limited to 25 records.",
+        Parameters = JsonHelpers.FromObjectAsJson(
             new
             {
                 Type = "object",
@@ -173,7 +177,7 @@ public static class Functions
                 },
                 Required = Array.Empty<string>()
             })
-    );
+    };
 
     public class GetCustomerProductsRevenueParameters
     {
