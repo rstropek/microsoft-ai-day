@@ -8,7 +8,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Azure.AI.OpenAI" />
+    <PackageReference Include="OpenAI" />
     <PackageReference Include="dotenv.net" />
   </ItemGroup>
 

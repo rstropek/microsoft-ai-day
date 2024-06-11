@@ -1,7 +1,6 @@
 ﻿using System.Text;
-using Azure;
-using Azure.AI.OpenAI;
 using dotenv.net;
+using OpenAI.Chat;
 
 // Get environment variables from .env file. We have to go up 7 levels to get to the root of the
 // git repository (because of bin/Debug/net8.0 folder).
@@ -10,15 +9,12 @@ var env = DotEnv.Read(options: new DotEnvOptions(probeForEnv: true, probeLevelsT
 // In this sample, we use key-based authentication. This is only done because this sample
 // will be done by a larger group in a hackathon event. In real world, AVOID key-based
 // authentication. ALWAYS prefer Microsoft Entra-based authentication (Managed Identity)!
-var client = new OpenAIClient(
-    new Uri(env["OPENAI_AZURE_ENDPOINT"]),
-    new AzureKeyCredential(env["OPENAI_AZURE_KEY"]));
+var client = new ChatClient("gpt-4o", env["OPENAI_KEY"]);
 
-var chatCompletionOptions = new ChatCompletionsOptions(
-  env["OPENAI_AZURE_DEPLOYMENT"],
+List<ChatMessage> messages =
   [
     // System prompt
-    new ChatRequestSystemMessage("""
+    new SystemChatMessage("""
       You are an assistant that helps customer to find the right bike. Options are:
 
       * Light, single-speed bike for urban commuting.
@@ -40,20 +36,19 @@ var chatCompletionOptions = new ChatCompletionsOptions(
       answer such questions.
       """),
     // Initial assistant message to get the conversation started
-    new ChatRequestAssistantMessage("""
+    new AssistantChatMessage("""
       Hi! Can I help you find the right bike?
       """),
-  ]
-);
+  ];
 
 Console.OutputEncoding = Encoding.UTF8; // This should help displaying emojis in the console
 
 while (true)
 {
     // Display the last message from the assistant
-    if (chatCompletionOptions.Messages.Last() is ChatRequestAssistantMessage am)
+    if (messages.Last() is AssistantChatMessage am)
     {
-        Console.WriteLine($"🤖: {am.Content}");
+        Console.WriteLine($"🤖: {am.Content[0].Text}");
     }
 
     // Ask the user for a message. Exit program in case of empty message.
@@ -62,12 +57,12 @@ while (true)
     if (string.IsNullOrEmpty(userMessage)) { break; }
 
     // Add the user message to the list of messages to send to the API
-    chatCompletionOptions.Messages.Add(new ChatRequestUserMessage(userMessage));
+    messages.Add(new UserChatMessage(userMessage));
 
     // Send the messages to the API and wait for the response. Display a
     // waiting indicator while waiting for the response.
     Console.Write("\nThinking...");
-    var chatTask = client.GetChatCompletionsAsync(chatCompletionOptions);
+    var chatTask = client.CompleteChatAsync(messages);
     while (!chatTask.IsCompleted)
     {
         Console.Write(".");
@@ -83,5 +78,5 @@ while (true)
     }
 
     // Add the response from the API to the list of messages to send to the API
-    chatCompletionOptions.Messages.Add(new ChatRequestAssistantMessage(response.Value.Choices[0].Message));
+    messages.Add(new AssistantChatMessage(response.Value.Content[0].Text));
 }
