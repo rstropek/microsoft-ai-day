@@ -1,3 +1,5 @@
+using System.Text;
+using System.Text.Json;
 using OpenAI;
 using OpenAI.Assistants;
 #pragma warning disable OPENAI001
@@ -43,6 +45,7 @@ static class OpenAIExtensions
         var asyncUpdate = client.CreateRunStreamingAsync(threadId, assistantId);
 
         ThreadRun? currentRun;
+        var codeInterpreterCode = new StringBuilder();
         do
         {
             currentRun = null;
@@ -68,6 +71,11 @@ static class OpenAIExtensions
 
                     outputsToSumit.Add(new ToolOutput(requiredActionUpdate.ToolCallId, functionResponse));
                 }
+                else if (update is RunStepDetailsUpdate runStepDetailsUpdate
+                    && !string.IsNullOrEmpty(runStepDetailsUpdate.CodeInterpreterInput))
+                {
+                    codeInterpreterCode.Append(runStepDetailsUpdate.CodeInterpreterInput);
+                }
                 else if (update is MessageContentUpdate contentUpdate)
                 {
                     yield return contentUpdate.Text;
@@ -80,6 +88,12 @@ static class OpenAIExtensions
             }
         }
         while (currentRun?.Status.IsTerminal is false);
+
+        if (codeInterpreterCode.Length > 0)
+        {
+            Console.WriteLine("\n\nCODE INTERPRETER:");
+            Console.WriteLine(codeInterpreterCode.ToString());
+        }
     }
 
     public static async Task<string?> GetLatestMessage(this AssistantClient client, string threadId)
