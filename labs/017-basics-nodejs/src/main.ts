@@ -6,7 +6,21 @@ import { readLine } from './inputHelpers.js';
 
 dotenv.config({ path: '.env' });
 
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+let openAIType: string;
+do {
+  openAIType = await readLine('Do you want to use OpenAI (1) or Azure OpenAI (2)? ');
+} while (openAIType !== '1' && openAIType !== '2');
+
+let openai: OpenAI;
+if (openAIType === '1') {
+  openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+} else {
+  openai = new OpenAI({
+    baseURL: process.env.AZURE_OPENAI_BASE_URL,
+    defaultQuery: { 'api-version': '2024-05-01-preview' },
+    defaultHeaders: { 'api-key': process.env.AZURE_OPENAI_API_KEY },
+  });
+}
 
 const systemPrompt = await fs.promises.readFile('system-prompt.md', {
   encoding: 'utf-8',
@@ -35,10 +49,17 @@ while (true) {
   });
 
   // get AI response
-  const response = await openai.chat.completions.create({
-    messages,
-    model: 'gpt-4o-mini',
-  });
+  const options: OpenAI.RequestOptions = {};
+  if (openAIType === '2') {
+    options.path = `openai/deployments/${process.env.MODEL}/chat/completions`;
+  }
+  const response = await openai.chat.completions.create(
+    {
+      messages,
+      model: process.env.MODEL!,
+    },
+    options
+  );
 
   // add AI response to messages
   messages.push({
