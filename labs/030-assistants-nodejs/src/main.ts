@@ -19,17 +19,19 @@ logger.info('Creating connection pool');
 const pool = await createConnectionPool(process.env.ADVENTURE_WORKS ?? '');
 logger.info('Connection pool connected');
 
-const openai = new OpenAI({
-    // Note that this base URL is different from the one that you would need for 
-    // chat completions API. The base URL here is for the new Assistants API.
-    baseURL: `${process.env.OPENAI_AZURE_ENDPOINT}/openai`,
-    apiKey: process.env.OPENAI_AZURE_KEY,
-    defaultQuery: { 'api-version': '2024-03-01-preview' },
-    defaultHeaders: { 'api-key': process.env.OPENAI_AZURE_KEY }
-});
+// const openai = new OpenAI({
+//     // Note that this base URL is different from the one that you would need for 
+//     // chat completions API. The base URL here is for the new Assistants API.
+//     baseURL: `${process.env.OPENAI_AZURE_ENDPOINT}/openai`,
+//     apiKey: process.env.OPENAI_AZURE_KEY,
+//     defaultQuery: { 'api-version': '2024-03-01-preview' },
+//     defaultHeaders: { 'api-key': process.env.OPENAI_AZURE_KEY }
+// });
+
+const openai = new OpenAI({ apiKey: process.env.OPENAI_KEY! });
 
 let assistant = await openai.beta.assistants.createOrUpdate({
-    model: process.env.OPENAI_AZURE_DEPLOYMENT ?? '',
+    model: process.env.OPENAI_MODEL!, // process.env.OPENAI_AZURE_DEPLOYMENT ?? '',
     name: 'Revenue Analyzer',
     description: 'Retrieves customer and product revenue and analyzes it using code interpreter',
     tools: [

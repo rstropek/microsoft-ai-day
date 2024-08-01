@@ -21,7 +21,7 @@ export async function createConnectionPool(connectionString: string): Promise<sq
     }
 
     const config: sql.config = {
-        user: connectionStringParts.get('User ID') ?? '',
+        user: connectionStringParts.get('User') ?? '',
         password: connectionStringParts.get('Password') ?? '',
         server: server,
         database: connectionStringParts.get('Initial Catalog') ?? '',
