@@ -1,0 +1,28 @@
+{
+  "name": "042-qdrant-rag",
+  "version": "1.0.0",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "qdrant": "docker pull qdrant/qdrant:latest && docker run -p 6333:6333 -p 6334:6334 qdrant/qdrant",
+    "build": "tsc",
+    "start": "npm run build && node ./dist/main.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "@types/mssql": "^9.1.5",
+    "@types/node": "^22.1.0",
+    "typescript": "^5.4.3"
+  },
+  "dependencies": {
+    "@qdrant/js-client-rest": "^1.10.0",
+    "dotenv": "^16.4.5",
+    "mathjs": "^13.0.3",
+    "mssql": "^11.0.1",
+    "openai": "^4.29.2",
+    "tedious": "^18.1.0",
+    "winston": "^3.13.0"
+  }
+}
