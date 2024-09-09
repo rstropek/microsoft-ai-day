@@ -10,9 +10,11 @@ static class OpenAIExtensions
 {
     public static async Task<Assistant?> FindAssistantByName(this AssistantClient client, string name)
     {
-        await foreach (var assistant in client.GetAssistantsAsync())
+        await foreach (var assistants in client.GetAssistantsAsync())
         {
-            if (assistant.Name == name) { return assistant; }
+            foreach (var assistant in assistants.Values) {
+                if (assistant.Name == name) { return assistant; }
+            }
         }
 
         return null;
@@ -41,7 +43,7 @@ static class OpenAIExtensions
     public static async IAsyncEnumerable<string> AddMessageAndRunToCompletion(this AssistantClient client, string threadId, string assistantId,
         string message, Func<RequiredActionUpdate, Task<object>>? functionCallback = null)
     {
-        await client.CreateMessageAsync(threadId, [message]);
+        await client.CreateMessageAsync(threadId, MessageRole.User, [message]);
         var asyncUpdate = client.CreateRunStreamingAsync(threadId, assistantId);
 
         ThreadRun? currentRun;
@@ -98,9 +100,9 @@ static class OpenAIExtensions
 
     public static async Task<string?> GetLatestMessage(this AssistantClient client, string threadId)
     {
-        await foreach(var msg in client.GetMessagesAsync(threadId, ListOrder.NewestFirst))
+        await foreach(var msgs in client.GetMessagesAsync(threadId, new MessageCollectionOptions() { Order = ListOrder.NewestFirst }))
         {
-            return msg.Content[0].Text;
+            return msgs.Values[0]?.Content[0].Text;
         }
 
         return null;

@@ -4,6 +4,7 @@ using Dapper;
 using Microsoft.Data.SqlClient;
 using OpenAI.Assistants;
 using OpenAI.Chat;
+#pragma warning disable OPENAI001
 
 namespace AssistantsDotNet;
 
