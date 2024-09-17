@@ -1,4 +1,5 @@
 ﻿using System.ClientModel;
+using System.ClientModel.Primitives;
 using System.Text.Json;
 using dotenv.net;
 using OpenAI.Assistants;
@@ -6,72 +7,123 @@ using OpenAI.Assistants;
 
 var env = DotEnv.Read(options: new DotEnvOptions(probeForEnv: true, probeLevelsToSearch: 7));
 
-var client = new AssistantClient(env["OPENAI_KEY"]);
+// This example parallels the content at the following location:
+// https://platform.openai.com/docs/assistants/tools/function-calling/function-calling-beta
+#region Step 1 - Define Functions
 
-var assistant = await client.CreateAssistantAsync(env["OPENAI_MODEL"], new AssistantCreationOptions
+// First, define the functions that the assistant will use in its defined tools.
+
+FunctionToolDefinition getTemperatureTool = new()
 {
-    Name = "Test Assistant",
-    Description = "Test Assistant",
-    Instructions = "You are a helpful assistant that can answer questions about the secret number.",
-    Tools = {
-        new CodeInterpreterToolDefinition(),
-        new FunctionToolDefinition()
-        {
-            FunctionName = "getSecretNumber",
-            Description = "Gets the secret number",
-            Parameters = BinaryData.FromObjectAsJson(
-                new
-                {
-                    Type = "object",
-                    Properties = new
-                    {
-                        Seed = new { Type = "integer", Description = "Optional seed for the secret number." },
-                    },
-                    Required = Array.Empty<string>()
-                }, new() { PropertyNamingPolicy = JsonNamingPolicy.CamelCase })
+    FunctionName = "get_current_temperature",
+    Description = "Gets the current temperature at a specific location.",
+    Parameters = BinaryData.FromString("""
+    {
+        "type": "object",
+        "properties": {
+        "location": {
+            "type": "string",
+            "description": "The city and state, e.g., San Francisco, CA"
+        },
+        "unit": {
+            "type": "string",
+            "enum": ["Celsius", "Fahrenheit"],
+            "description": "The temperature unit to use. Infer this from the user's location."
+        }
         }
     }
-});
+    """),
+};
 
-var thread = await client.CreateThreadAsync();
-Console.WriteLine($"Thread ID: {thread.Value.Id}");
+FunctionToolDefinition getRainProbabilityTool = new()
+{
+    FunctionName = "get_current_rain_probability",
+    Description = "Gets the current forecasted probability of rain at a specific location,"
+        + " represented as a percent chance in the range of 0 to 100.",
+    Parameters = BinaryData.FromString("""
+    {
+        "type": "object",
+        "properties": {
+        "location": {
+            "type": "string",
+            "description": "The city and state, e.g., San Francisco, CA"
+        }
+        },
+        "required": ["location"]
+    }
+    """),
+};
 
-// The following line works (no function call)
-//await client.CreateMessageAsync(thread.Value.Id, MessageRole.User, ["Are dolphins fish?"]);
+#endregion
 
-// The following line crashes (function call)
-await client.CreateMessageAsync(thread.Value.Id, MessageRole.User, ["Tell me the scret number with seed 1"]);
+// Assistants is a beta API and subject to change; acknowledge its experimental status by suppressing the matching warning.
+AssistantClient client = new(env["OPENAI_KEY"]!);
 
-AsyncCollectionResult<StreamingUpdate> asyncUpdate = client.CreateRunStreamingAsync(thread.Value.Id, assistant.Value.Id);
-Console.WriteLine();
-ThreadRun? currentRun;
+#region Create a new assistant with function tools
+// Create an assistant that can call the function tools.
+AssistantCreationOptions assistantOptions = new()
+{
+    Name = "Example: Function Calling",
+    Instructions =
+        "Don't make assumptions about what values to plug into functions."
+        + " Ask for clarification if a user request is ambiguous.",
+    Tools = { getTemperatureTool, getRainProbabilityTool },
+};
+
+Assistant assistant = await client.CreateAssistantAsync(env["OPENAI_MODEL"]!, assistantOptions);
+#endregion
+
+#region Step 2 - Create a thread and add messages
+AssistantThread thread = await client.CreateThreadAsync();
+ThreadMessage message = await client.CreateMessageAsync(
+    thread,
+    MessageRole.User,
+    [
+        "What's the weather in San Francisco today and the likelihood it'll rain?"
+    ]);
+#endregion
+
+#region Step 3 - Initiate a streaming run
+AsyncCollectionResult<StreamingUpdate> asyncUpdates
+    = client.CreateRunStreamingAsync(thread, assistant);
+
+ThreadRun? currentRun = null;
 do
 {
-    List<ToolOutput> outputsToSumit = [];
     currentRun = null;
-    await foreach (StreamingUpdate update in asyncUpdate)
+    List<ToolOutput> outputsToSubmit = [];
+    await foreach (StreamingUpdate update in asyncUpdates)
     {
-        if (update is RunUpdate runUpdate) { currentRun = runUpdate; }
+        if (update is RunUpdate runUpdate)
+        {
+            currentRun = runUpdate;
+        }
         else if (update is RequiredActionUpdate requiredActionUpdate)
         {
-            Console.WriteLine($"Calling function {requiredActionUpdate.FunctionName} {requiredActionUpdate.FunctionArguments}");
-            outputsToSumit.Add(new ToolOutput(requiredActionUpdate.ToolCallId, "{ \"SecretNumber\": 42 }"));
+            if (requiredActionUpdate.FunctionName == getTemperatureTool.FunctionName)
+            {
+                outputsToSubmit.Add(new ToolOutput(requiredActionUpdate.ToolCallId, "57"));
+            }
+            else if (requiredActionUpdate.FunctionName == getRainProbabilityTool.FunctionName)
+            {
+                outputsToSubmit.Add(new ToolOutput(requiredActionUpdate.ToolCallId, "25%"));
+            }
         }
         else if (update is MessageContentUpdate contentUpdate)
         {
             Console.Write(contentUpdate.Text);
         }
-
-        if (outputsToSumit.Count != 0)
-        {
-            asyncUpdate = client.SubmitToolOutputsToRunStreamingAsync(currentRun, outputsToSumit);
-        }
     }
-
-    if (outputsToSumit.Count != 0)
+    if (outputsToSubmit.Count > 0)
     {
-        asyncUpdate = client.SubmitToolOutputsToRunStreamingAsync(currentRun, outputsToSumit);
+        asyncUpdates = client.SubmitToolOutputsToRunStreamingAsync(currentRun, outputsToSubmit);
     }
-} while (currentRun?.Status.IsTerminal is false);
+}
+while (currentRun?.Status.IsTerminal == false);
 
-Console.WriteLine("\nDone.");
+#endregion
+
+// Optionally, delete the resources for tidiness if no longer needed.
+RequestOptions noThrowOptions = new() { ErrorOptions = ClientErrorBehaviors.NoThrow };
+_ = await client.DeleteThreadAsync(thread.Id, noThrowOptions);
+_ = await client.DeleteAssistantAsync(assistant.Id, noThrowOptions);
