@@ -98,7 +98,7 @@ OpenAI.Beta.Threads.prototype.addMessageAndRunToCompletion = async function (ass
                             logger?.info('Code Interpreter call', { code: call.code_interpreter.input });
                         }
                     } else {
-                        logger?.info('Working on Code Interpreter script');
+                        // logger?.info('Working on Code Interpreter script');
                     }
                 }
             }
