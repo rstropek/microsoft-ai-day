@@ -59,24 +59,22 @@ while (true)
     // Add the user message to the list of messages to send to the API
     messages.Add(new UserChatMessage(userMessage));
 
-    // Send the messages to the API and wait for the response. Display a
-    // waiting indicator while waiting for the response.
-    Console.Write("\nThinking...");
-    var chatTask = client.CompleteChatAsync(messages);
-    while (!chatTask.IsCompleted)
-    {
-        Console.Write(".");
-        await Task.Delay(1000);
-    }
+    // This time we use streaming
+    var chatTask = client.CompleteChatStreamingAsync(messages);
 
     Console.WriteLine("\n");
-    var response = await chatTask;
-    if (response.GetRawResponse().IsError)
+    var message = new StringBuilder();
+    await foreach (var update in chatTask)
     {
-        Console.WriteLine($"Error: {response.GetRawResponse().ReasonPhrase}");
-        break;
+        if (update.ContentUpdate.Count > 0)
+        {
+            Console.Write(update.ContentUpdate[0].Text);
+            message.Append(update.ContentUpdate[0].Text);
+        }
     }
 
+    Console.WriteLine();
+
     // Add the response from the API to the list of messages to send to the API
-    messages.Add(new AssistantChatMessage(response.Value.Content[0].Text));
+    messages.Add(new AssistantChatMessage(message.ToString()));
 }

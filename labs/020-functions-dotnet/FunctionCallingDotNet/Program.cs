@@ -16,7 +16,7 @@ var context = new ApplicationDataContext(builder.Options);
 // In this sample, we use key-based authentication. This is only done because this sample
 // will be done by a larger group in a hackathon event. In real world, AVOID key-based
 // authentication. ALWAYS prefer Microsoft Entra-based authentication (Managed Identity)!
-var client = new ChatClient("gpt-4o", env["OPENAI_KEY"]);
+var client = new ChatClient(env["OPENAI_MODEL"], env["OPENAI_KEY"]);
 
 List<ChatMessage> messages =
   [
@@ -196,7 +196,7 @@ ChatCompletionOptions options = new()
 while (true)
 {
     Console.WriteLine($"🤖: {messages.Last().Content[0].Text}");
-    
+
     // Ask the user for a message. Exit program in case of empty message.
     string[] prompts =
     [

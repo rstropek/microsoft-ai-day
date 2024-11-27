@@ -1,3 +1,4 @@
+using System.ClientModel;
 using System.Text;
 using System.Text.Json;
 using OpenAI;
@@ -10,11 +11,9 @@ static class OpenAIExtensions
 {
     public static async Task<Assistant?> FindAssistantByName(this AssistantClient client, string name)
     {
-        await foreach (var assistants in client.GetAssistantsAsync())
+        await foreach (var assistant in client.GetAssistantsAsync())
         {
-            foreach (var assistant in assistants.Values) {
-                if (assistant.Name == name) { return assistant; }
-            }
+            if (assistant.Name == name) { return assistant; }
         }
 
         return null;
@@ -31,8 +30,13 @@ static class OpenAIExtensions
                 Name = assistant.Name,
                 Description = assistant.Description,
                 Instructions = assistant.Instructions,
-                DefaultTools = assistant.Tools,
             };
+
+            updateOptions.DefaultTools.Clear();
+            foreach (var tool in assistant.Tools)
+            {
+                updateOptions.DefaultTools.Add(tool);
+            }
 
             return await client.ModifyAssistantAsync(existing.Id, updateOptions);
         }
@@ -44,7 +48,7 @@ static class OpenAIExtensions
         string message, Func<RequiredActionUpdate, Task<object>>? functionCallback = null)
     {
         await client.CreateMessageAsync(threadId, MessageRole.User, [message]);
-        var asyncUpdate = client.CreateRunStreamingAsync(threadId, assistantId);
+        AsyncCollectionResult<StreamingUpdate> asyncUpdate = client.CreateRunStreamingAsync(threadId, assistantId);
 
         ThreadRun? currentRun;
         var codeInterpreterCode = new StringBuilder();
@@ -52,10 +56,9 @@ static class OpenAIExtensions
         {
             currentRun = null;
             List<ToolOutput> outputsToSumit = [];
-            await foreach (var update in asyncUpdate)
+            await foreach (StreamingUpdate update in asyncUpdate)
             {
-                if (update is RunUpdate runUpdate) { currentRun = runUpdate; }
-                else if (update is RequiredActionUpdate requiredActionUpdate && functionCallback != null)
+                if (update is RequiredActionUpdate requiredActionUpdate && functionCallback != null)
                 {
                     Console.WriteLine($"Calling function {requiredActionUpdate.ToolCallId} {requiredActionUpdate.FunctionName} {requiredActionUpdate.FunctionArguments}");
 
@@ -73,20 +76,21 @@ static class OpenAIExtensions
 
                     outputsToSumit.Add(new ToolOutput(requiredActionUpdate.ToolCallId, functionResponse));
                 }
+                else if (update is RunUpdate runUpdate) { currentRun = runUpdate; }
+                else if (update is MessageContentUpdate contentUpdate)
+                {
+                    yield return contentUpdate.Text;
+                }
                 else if (update is RunStepDetailsUpdate runStepDetailsUpdate
                     && !string.IsNullOrEmpty(runStepDetailsUpdate.CodeInterpreterInput))
                 {
                     codeInterpreterCode.Append(runStepDetailsUpdate.CodeInterpreterInput);
                 }
-                else if (update is MessageContentUpdate contentUpdate)
-                {
-                    yield return contentUpdate.Text;
-                }
             }
 
             if (outputsToSumit.Count != 0)
             {
-                asyncUpdate = client.SubmitToolOutputsToRunStreamingAsync(currentRun, outputsToSumit);
+                asyncUpdate = client.SubmitToolOutputsToRunStreamingAsync(threadId, currentRun!.Id, outputsToSumit);
             }
         }
         while (currentRun?.Status.IsTerminal is false);
@@ -100,9 +104,9 @@ static class OpenAIExtensions
 
     public static async Task<string?> GetLatestMessage(this AssistantClient client, string threadId)
     {
-        await foreach(var msgs in client.GetMessagesAsync(threadId, new MessageCollectionOptions() { Order = ListOrder.NewestFirst }))
+        await foreach(var msgs in client.GetMessagesAsync(threadId, new MessageCollectionOptions() { Order = MessageCollectionOrder.Descending }))
         {
-            return msgs.Values[0]?.Content[0].Text;
+            return msgs?.Content[0].Text;
         }
 
         return null;

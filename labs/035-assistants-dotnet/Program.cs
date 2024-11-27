@@ -66,19 +66,15 @@ while (true)
     }
 
     var first = true;
-    await foreach (var message in client.AddMessageAndRunToCompletion(thread.Value.Id, assistant.Id, userMessage, async functionCall =>
+    await foreach(var message in client.AddMessageAndRunToCompletion(thread.Value.Id, assistant.Id, userMessage, async functionCall =>
     {
-        switch (functionCall.FunctionName)
+        return functionCall.FunctionName switch
         {
-            case "getCustomers":
-                return await Functions.GetCustomers(sqlConnection, JsonHelpers.Deserialize<Functions.GetCustomersParameters>(functionCall.FunctionArguments)!);
-            case "getProducts":
-                return await Functions.GetProducts(sqlConnection, JsonHelpers.Deserialize<Functions.GetProductsParameters>(functionCall.FunctionArguments)!);
-            case "getCustomerProductsRevenue":
-                return await Functions.GetCustomerProductsRevenue(sqlConnection, JsonHelpers.Deserialize<Functions.GetCustomerProductsRevenueParameters>(functionCall.FunctionArguments)!);
-            default:
-                throw new Exception($"Function {functionCall.FunctionName} is not supported");
-        }
+            "getCustomers" => await Functions.GetCustomers(sqlConnection, JsonHelpers.Deserialize<Functions.GetCustomersParameters>(functionCall.FunctionArguments)!),
+            "getProducts" => await Functions.GetProducts(sqlConnection, JsonHelpers.Deserialize<Functions.GetProductsParameters>(functionCall.FunctionArguments)!),
+            "getCustomerProductsRevenue" => await Functions.GetCustomerProductsRevenue(sqlConnection, JsonHelpers.Deserialize<Functions.GetCustomerProductsRevenueParameters>(functionCall.FunctionArguments)!),
+            _ => throw new Exception($"Function {functionCall.FunctionName} is not supported"),
+        };
     }))
     {
         if (first) { Console.Write($"\n🤖: "); first = false; }

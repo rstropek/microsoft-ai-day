@@ -15,6 +15,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "035-assistants-dotnet", "03
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "090-bug-repro", "090-bug-repro\090-bug-repro.csproj", "{6FBC2C6A-A3D4-4459-A995-C94B9213C1CD}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ApiBasicsDotNet", "012-basics-dotnet-streaming\ApiBasicsDotNet.csproj", "{F83DD00A-465E-4E47-BDA5-163E6F45CE8F}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -40,6 +42,10 @@ Global
 		{6FBC2C6A-A3D4-4459-A995-C94B9213C1CD}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{6FBC2C6A-A3D4-4459-A995-C94B9213C1CD}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{6FBC2C6A-A3D4-4459-A995-C94B9213C1CD}.Release|Any CPU.Build.0 = Release|Any CPU
+		{F83DD00A-465E-4E47-BDA5-163E6F45CE8F}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{F83DD00A-465E-4E47-BDA5-163E6F45CE8F}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{F83DD00A-465E-4E47-BDA5-163E6F45CE8F}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{F83DD00A-465E-4E47-BDA5-163E6F45CE8F}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
 		{6569C5F1-0230-43E5-9041-1CD4C214F748} = {ECF40993-4AD0-441E-93E7-F80E62465259}

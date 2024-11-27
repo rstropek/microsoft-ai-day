@@ -18,21 +18,21 @@ FunctionToolDefinition getTemperatureTool = new()
     FunctionName = "get_current_temperature",
     Description = "Gets the current temperature at a specific location.",
     Parameters = BinaryData.FromString("""
-    {
-        "type": "object",
-        "properties": {
-        "location": {
-            "type": "string",
-            "description": "The city and state, e.g., San Francisco, CA"
-        },
-        "unit": {
-            "type": "string",
-            "enum": ["Celsius", "Fahrenheit"],
-            "description": "The temperature unit to use. Infer this from the user's location."
-        }
-        }
-    }
-    """),
+            {
+              "type": "object",
+              "properties": {
+                "location": {
+                  "type": "string",
+                  "description": "The city and state, e.g., San Francisco, CA"
+                },
+                "unit": {
+                  "type": "string",
+                  "enum": ["Celsius", "Fahrenheit"],
+                  "description": "The temperature unit to use. Infer this from the user's location."
+                }
+              }
+            }
+            """),
 };
 
 FunctionToolDefinition getRainProbabilityTool = new()
@@ -41,23 +41,23 @@ FunctionToolDefinition getRainProbabilityTool = new()
     Description = "Gets the current forecasted probability of rain at a specific location,"
         + " represented as a percent chance in the range of 0 to 100.",
     Parameters = BinaryData.FromString("""
-    {
-        "type": "object",
-        "properties": {
-        "location": {
-            "type": "string",
-            "description": "The city and state, e.g., San Francisco, CA"
-        }
-        },
-        "required": ["location"]
-    }
-    """),
+            {
+              "type": "object",
+              "properties": {
+                "location": {
+                  "type": "string",
+                  "description": "The city and state, e.g., San Francisco, CA"
+                }
+              },
+              "required": ["location"]
+            }
+            """),
 };
 
 #endregion
 
 // Assistants is a beta API and subject to change; acknowledge its experimental status by suppressing the matching warning.
-AssistantClient client = new(env["OPENAI_KEY"]!);
+AssistantClient client = new(env["OPENAI_KEY"]);
 
 #region Create a new assistant with function tools
 // Create an assistant that can call the function tools.
@@ -70,13 +70,13 @@ AssistantCreationOptions assistantOptions = new()
     Tools = { getTemperatureTool, getRainProbabilityTool },
 };
 
-Assistant assistant = await client.CreateAssistantAsync(env["OPENAI_MODEL"]!, assistantOptions);
+Assistant assistant = await client.CreateAssistantAsync(env["OPENAI_MODEL"], assistantOptions);
 #endregion
 
 #region Step 2 - Create a thread and add messages
 AssistantThread thread = await client.CreateThreadAsync();
 ThreadMessage message = await client.CreateMessageAsync(
-    thread,
+    thread.Id,
     MessageRole.User,
     [
         "What's the weather in San Francisco today and the likelihood it'll rain?"
@@ -85,20 +85,16 @@ ThreadMessage message = await client.CreateMessageAsync(
 
 #region Step 3 - Initiate a streaming run
 AsyncCollectionResult<StreamingUpdate> asyncUpdates
-    = client.CreateRunStreamingAsync(thread, assistant);
+    = client.CreateRunStreamingAsync(thread.Id, assistant.Id);
 
-ThreadRun? currentRun = null;
+ThreadRun currentRun = null;
 do
 {
     currentRun = null;
     List<ToolOutput> outputsToSubmit = [];
     await foreach (StreamingUpdate update in asyncUpdates)
     {
-        if (update is RunUpdate runUpdate)
-        {
-            currentRun = runUpdate;
-        }
-        else if (update is RequiredActionUpdate requiredActionUpdate)
+        if (update is RequiredActionUpdate requiredActionUpdate)
         {
             if (requiredActionUpdate.FunctionName == getTemperatureTool.FunctionName)
             {
@@ -109,6 +105,10 @@ do
                 outputsToSubmit.Add(new ToolOutput(requiredActionUpdate.ToolCallId, "25%"));
             }
         }
+        else if (update is RunUpdate runUpdate)
+        {
+            currentRun = runUpdate;
+        }
         else if (update is MessageContentUpdate contentUpdate)
         {
             Console.Write(contentUpdate.Text);
@@ -116,7 +116,7 @@ do
     }
     if (outputsToSubmit.Count > 0)
     {
-        asyncUpdates = client.SubmitToolOutputsToRunStreamingAsync(currentRun, outputsToSubmit);
+        asyncUpdates = client.SubmitToolOutputsToRunStreamingAsync(currentRun.ThreadId, currentRun.Id, outputsToSubmit);
     }
 }
 while (currentRun?.Status.IsTerminal == false);

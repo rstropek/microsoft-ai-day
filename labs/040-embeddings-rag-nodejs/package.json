@@ -18,7 +18,7 @@
   },
   "dependencies": {
     "dotenv": "^16.4.5",
-    "mathjs": "^13.0.3",
+    "mathjs": "^14.0.0",
     "mssql": "^11.0.1",
     "openai": "^4.29.2",
     "tedious": "^18.1.0",
