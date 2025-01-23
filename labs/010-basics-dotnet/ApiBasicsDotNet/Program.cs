@@ -1,4 +1,6 @@
 ﻿using System.Text;
+using Azure.AI.OpenAI;
+using Azure.Identity;
 using dotenv.net;
 using OpenAI.Chat;
 
@@ -6,10 +8,18 @@ using OpenAI.Chat;
 // git repository (because of bin/Debug/net8.0 folder).
 var env = DotEnv.Read(options: new DotEnvOptions(probeForEnv: true, probeLevelsToSearch: 7));
 
+ChatClient client;
+
+// OPENAI
 // In this sample, we use key-based authentication. This is only done because this sample
 // will be done by a larger group in a hackathon event. In real world, AVOID key-based
 // authentication. ALWAYS prefer Microsoft Entra-based authentication (Managed Identity)!
-var client = new ChatClient(env["OPENAI_MODEL"], env["OPENAI_KEY"]);
+//client = new ChatClient(env["OPENAI_MODEL"], env["OPENAI_KEY"]);
+
+// AZURE OPENAI (with managed identity)
+var options = new DefaultAzureCredentialOptions { TenantId = "022e4faf-c745-475a-be06-06b1e1c9e39d" };
+AzureOpenAIClient azureClient = new(new Uri("https://oai-rstropek-sweden.openai.azure.com/"), new DefaultAzureCredential(options));
+client = azureClient.GetChatClient("gpt-4o");
 
 List<ChatMessage> messages =
   [
@@ -45,38 +55,38 @@ Console.OutputEncoding = Encoding.UTF8; // This should help displaying emojis in
 
 while (true)
 {
-    // Display the last message from the assistant
-    if (messages.Last() is AssistantChatMessage am)
-    {
-        Console.WriteLine($"🤖: {am.Content[0].Text}");
-    }
+  // Display the last message from the assistant
+  if (messages.Last() is AssistantChatMessage am)
+  {
+    Console.WriteLine($"🤖: {am.Content[0].Text}");
+  }
 
-    // Ask the user for a message. Exit program in case of empty message.
-    Console.Write("\nYou (just press enter to exit the conversation): ");
-    var userMessage = Console.ReadLine();
-    if (string.IsNullOrEmpty(userMessage)) { break; }
+  // Ask the user for a message. Exit program in case of empty message.
+  Console.Write("\nYou (just press enter to exit the conversation): ");
+  var userMessage = Console.ReadLine();
+  if (string.IsNullOrEmpty(userMessage)) { break; }
 
-    // Add the user message to the list of messages to send to the API
-    messages.Add(new UserChatMessage(userMessage));
+  // Add the user message to the list of messages to send to the API
+  messages.Add(new UserChatMessage(userMessage));
 
-    // Send the messages to the API and wait for the response. Display a
-    // waiting indicator while waiting for the response.
-    Console.Write("\nThinking...");
-    var chatTask = client.CompleteChatAsync(messages);
-    while (!chatTask.IsCompleted)
-    {
-        Console.Write(".");
-        await Task.Delay(1000);
-    }
+  // Send the messages to the API and wait for the response. Display a
+  // waiting indicator while waiting for the response.
+  Console.Write("\nThinking...");
+  var chatTask = client.CompleteChatAsync(messages);
+  while (!chatTask.IsCompleted)
+  {
+    Console.Write(".");
+    await Task.Delay(1000);
+  }
 
-    Console.WriteLine("\n");
-    var response = await chatTask;
-    if (response.GetRawResponse().IsError)
-    {
-        Console.WriteLine($"Error: {response.GetRawResponse().ReasonPhrase}");
-        break;
-    }
+  Console.WriteLine("\n");
+  var response = await chatTask;
+  if (response.GetRawResponse().IsError)
+  {
+    Console.WriteLine($"Error: {response.GetRawResponse().ReasonPhrase}");
+    break;
+  }
 
-    // Add the response from the API to the list of messages to send to the API
-    messages.Add(new AssistantChatMessage(response.Value.Content[0].Text));
+  // Add the response from the API to the list of messages to send to the API
+  messages.Add(new AssistantChatMessage(response.Value.Content[0].Text));
 }
